@@ -1,0 +1,30 @@
+# --- 密钥 / 环境 ---
+.env
+.env.local
+.env.*.local
+
+# --- 构建产物 ---
+backend/target/
+
+# --- Java / Maven ---
+target/
+!.mvn/wrapper/maven-wrapper.jar
+*.class
+*.jar
+!**/maven-wrapper.jar
+hs_err_pid*
+
+# --- 前端 ---
+node_modules/
+dist/
+.vite/
+
+# --- IDE ---
+.idea/
+*.iml
+.vscode/
+*.log
+
+# --- 系统 ---
+.DS_Store
+Thumbs.db

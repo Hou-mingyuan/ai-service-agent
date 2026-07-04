@@ -1,0 +1,64 @@
+server:
+  port: 8080
+  servlet:
+    encoding:
+      charset: UTF-8
+      force: true
+
+spring:
+  application:
+    name: ai-service-agent
+  # 默认使用内存 H2（MySQL 兼容模式），零依赖即可启动、跑测试。
+  # 生产用 MySQL：SPRING_PROFILES_ACTIVE=mysql（docker-compose 已注入）。
+  datasource:
+    url: jdbc:h2:mem:csagent;MODE=MySQL;DATABASE_TO_LOWER=TRUE;CASE_INSENSITIVE_IDENTIFIERS=TRUE;DB_CLOSE_DELAY=-1
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: ""
+  sql:
+    init:
+      mode: always
+      schema-locations: classpath:schema.sql
+      continue-on-error: false
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.slf4j.Slf4jImpl
+  global-config:
+    banner: false
+    db-config:
+      id-type: auto
+
+# ======================================================================
+# 业务与模型配置。所有敏感项（API Key）请通过环境变量或 .env 注入。
+# ======================================================================
+app:
+  cors:
+    allowed-origins: "*"
+  llm:
+    # provider: mock（离线内置，无需密钥）| openai（任意 OpenAI 兼容网关）
+    provider: ${LLM_PROVIDER:mock}
+    base-url: ${LLM_BASE_URL:https://api.openai.com/v1}
+    api-key: ${LLM_API_KEY:}
+    model: ${LLM_MODEL:gpt-4o-mini}
+    temperature: ${LLM_TEMPERATURE:0.3}
+    timeout-seconds: ${LLM_TIMEOUT:60}
+    max-tool-rounds: 3
+  agent:
+    history-turns: 8
+    # 情绪负面分数达到该阈值即自动升级 / 转人工
+    negative-escalate-threshold: 0.6
+    system-prompt: |
+      你是「智答」智能客服助手，服务于一家同时经营电商与保险业务的公司。
+      请用简体中文、礼貌专业地回答客户问题。
+      - 涉及订单、物流、保单、工单、预约改期等具体业务时，必须调用相应工具获取真实数据后再回答，禁止编造。
+      - 回答简洁、分点清晰；无法解决或客户强烈不满时，主动为其创建工单并转接人工坐席。
+
+logging:
+  level:
+    com.portfolio.csagent: INFO
