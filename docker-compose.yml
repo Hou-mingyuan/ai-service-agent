@@ -35,7 +35,7 @@ services:
       LLM_API_KEY: ${LLM_API_KEY:-}
       LLM_TEMPERATURE: ${LLM_TEMPERATURE:-0.3}
     ports:
-      - "8081:8080"
+      - "${BACKEND_HOST_PORT:-8081}:8080"
 
   frontend:
     build: ./frontend
@@ -43,7 +43,7 @@ services:
     depends_on:
       - backend
     ports:
-      - "8080:80"
+      - "${FRONTEND_HOST_PORT:-8080}:80"
 
 volumes:
   mysqldata:

@@ -117,6 +117,14 @@ docker compose up -d --build
 - 后端接口： http://localhost:8081/api/health
 - MySQL：容器内自动初始化库表与**示例数据**
 
+如果本机 8080 / 8081 已被占用，可在 `.env` 中覆盖宿主机端口后再启动：
+
+```bash
+FRONTEND_HOST_PORT=18082
+BACKEND_HOST_PORT=18083
+docker compose up -d --build
+```
+
 打开前端后可直接体验：
 
 1. 在「智能对话」输入 `帮我查订单123` → 观察 Agent 调用 `query_order` 工具并流式回答；
@@ -142,6 +150,8 @@ cd frontend
 npm install
 npm run dev        # http://localhost:5173 ，已代理 /api、/ws 到 http://localhost:8080
 ```
+
+前端构建基于 Vite 8，建议使用 Node.js 20.19+ 或 22.12+。
 
 ## ⚙️ 配置说明
 
