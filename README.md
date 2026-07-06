@@ -3,6 +3,7 @@
 > 面向电商 + 保险场景的**对话式智能客服系统**：多轮对话结合知识库问答、**Agent 工具调用（Function Calling）**打通订单/物流/保单/工单/预约改期等真实业务，**意图 + 情绪识别**驱动**自动升级转人工**与**工单闭环**，SSE 流式输出、坐席实时后台、运营数据看板一应俱全。一条 `docker compose` 命令即可拉起，**无需任何大模型密钥**也能完整体验。
 
 <p>
+  <img alt="CI" src="https://github.com/Hou-mingyuan/ai-service-agent/actions/workflows/ci.yml/badge.svg">
   <img alt="java" src="https://img.shields.io/badge/Java-17-orange?logo=openjdk&logoColor=white">
   <img alt="spring boot" src="https://img.shields.io/badge/Spring%20Boot-3.5-6DB33F?logo=springboot&logoColor=white">
   <img alt="mybatis-plus" src="https://img.shields.io/badge/MyBatis--Plus-3.5-red">
@@ -96,6 +97,10 @@ ai-service-agent/
 │  ├─ nginx.conf                     # 反代 /api、/ws（SSE 关闭缓冲）
 │  └─ Dockerfile
 ├─ docs/                             # 架构文档与截图
+├─ DEPLOYMENT.md       # 部署说明
+├─ SECURITY.md         # 安全策略与漏洞报告
+├─ PERFORMANCE_REPORT.md
+├─ performance/        # k6 压测脚本
 ├─ docker-compose.yml
 ├─ .env.example
 └─ README.md
@@ -132,6 +137,44 @@ docker compose up -d --build
 3. 输入 `你们太差了，我要投诉！` → 情绪识别为负面，**自动建单并转人工**；
 4. 切到「坐席工单」实时看到新工单，可指派、流转状态；
 5. 切到「数据看板」查看会话量、解决率、工单分布等。
+
+### Mock 零密钥演示（无需 API Key）
+
+| 配置项 | 默认值 | 说明 |
+| --- | --- | --- |
+| `LLM_PROVIDER` | `mock` | 内置离线模型，Compose 已注入 |
+| `LLM_API_KEY` | *(空)* | 留空即可；未配置时即使设为 `openai` 也会安全回退 Mock |
+| 数据库 | MySQL 容器 | Compose 自动初始化示例订单/保单/工单 |
+
+详细话术与验证步骤见 [docs/USAGE.md](docs/USAGE.md)。
+
+### 核心流程：对话 → 工具 → 工单
+
+```mermaid
+sequenceDiagram
+    participant User as 用户
+    participant FE as 前端 SSE
+    participant Agent as Agent 编排器
+    participant Tools as 业务工具
+    participant LLM as Mock / 真实 LLM
+    participant Ticket as 工单状态机
+    participant WS as 坐席 WebSocket
+
+    User->>FE: 输入问题
+    FE->>Agent: POST /api/chat (SSE)
+    Agent->>Agent: 意图 + 情绪识别
+    alt 负面情绪 / 显式转人工
+        Agent->>Ticket: 自动建单 + handoff
+        Ticket-->>WS: ticket.created
+    else 正常咨询
+        Agent->>LLM: 流式推理 + Function Calling
+        LLM-->>Agent: tool_call
+        Agent->>Tools: query_order / logistics / policy ...
+        Tools-->>Agent: Mock 业务数据
+        Agent-->>FE: event: token / tool_result
+    end
+    FE-->>User: 流式答案 + 工具可视化
+```
 
 ### 方式二：本地开发（零外部依赖）
 
@@ -245,6 +288,14 @@ mvn test
 - [ ] 多渠道接入（网页 / 公众号 / 企业微信）
 - [ ] 会话质检与满意度趋势分析
 - [ ] 用户与坐席鉴权（RBAC）、审计日志
+
+## 📚 相关文档
+
+- [Mock 零密钥体验指南](docs/USAGE.md)
+- [架构说明](docs/architecture.md)
+- [部署指南](DEPLOYMENT.md)
+- [安全策略](SECURITY.md)
+- [性能报告](PERFORMANCE_REPORT.md)
 
 ## 📄 许可证
 

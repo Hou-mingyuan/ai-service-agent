@@ -8,7 +8,8 @@ RUN npm run build
 
 # ---- 运行阶段（Nginx 托管静态资源 + 反代后端） ----
 FROM nginx:1.27-alpine
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+ENV BACKEND_HOST=backend
+COPY nginx.conf.template /etc/nginx/templates/default.conf.template
 COPY --from=build /app/dist /usr/share/nginx/html
 EXPOSE 80
 CMD ["nginx", "-g", "daemon off;"]
