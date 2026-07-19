@@ -5,6 +5,7 @@
 
 # --- 构建产物 ---
 backend/target/
+_optimization-screenshots/
 
 # --- Java / Maven ---
 target/

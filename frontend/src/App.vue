@@ -1,11 +1,31 @@
 <script setup lang="ts">
+import { onMounted, ref } from 'vue'
 import { RouterLink, RouterView } from 'vue-router'
+import { api } from './api'
+import { resetDemoWizard } from './demo'
 
 const nav = [
   { to: '/chat', label: '智能对话', icon: '💬' },
   { to: '/tickets', label: '坐席工单', icon: '🎫' },
   { to: '/dashboard', label: '数据看板', icon: '📊' }
 ]
+
+const llmProvider = ref('')
+
+onMounted(async () => {
+  try {
+    const h = await api.get<{ llmProvider: string }>('/api/health')
+    llmProvider.value = h.llmProvider
+  } catch {
+    /* ignore */
+  }
+})
+
+function restartDemo() {
+  resetDemoWizard()
+  location.hash = '#/chat'
+  location.reload()
+}
 </script>
 
 <template>
@@ -15,13 +35,19 @@ const nav = [
         <div class="logo">智</div>
         <div>
           <div class="brand-name">智答 · AI 智能客服 / 工单 Agent</div>
-          <div class="brand-sub">对话式客服 · 工具调用 · 工单闭环</div>
+          <div class="brand-sub">
+            对话式客服 · 工具调用 · 工单闭环
+            <span v-if="llmProvider" class="provider-tag">{{ llmProvider === 'mock' ? 'Mock 演示' : llmProvider }}</span>
+          </div>
         </div>
       </div>
       <nav class="nav">
         <RouterLink v-for="n in nav" :key="n.to" :to="n.to" class="nav-item" active-class="active">
           <span>{{ n.icon }}</span>{{ n.label }}
         </RouterLink>
+        <button v-if="llmProvider === 'mock'" class="nav-demo" @click="restartDemo" title="重置 Mock 演示向导">
+          🎯 演示
+        </button>
       </nav>
     </header>
     <main class="content">
@@ -58,5 +84,20 @@ const nav = [
 }
 .nav-item:hover { background: var(--primary-soft); color: var(--primary-600); }
 .nav-item.active { background: var(--primary); color: #fff; }
+.nav-demo {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 8px 12px; border-radius: 10px;
+  background: #fef3c7; color: #b45309; font-weight: 600; font-size: 13px;
+}
+.nav-demo:hover { background: #fde68a; }
+.provider-tag {
+  margin-left: 8px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--primary-soft);
+  color: var(--primary-600);
+  font-size: 11px;
+  font-weight: 600;
+}
 .content { flex: 1; overflow: hidden; padding: 20px 24px; }
 </style>

@@ -80,9 +80,55 @@ k6 结束时检查：
 - Docker Compose 默认 `LLM_PROVIDER=mock`，零密钥可完整演示。
 - k6 smoke 脚本已就绪，阈值与 [DEPLOYMENT.md](DEPLOYMENT.md) §6 一致。
 
+## k6 实测（2026-07-06）
+
+| 环境 | BASE | VU × 时长 | P95 (fast) | 失败率 | 备注 |
+| --- | --- | --- | --- | --- | --- |
+| Hub Profile (Round-6) | `:18084` | 20 × 30s | **294.7 ms** | **0%** | project-hub-2 复跑 · 504 iter · 阈值全过 |
+| Hub Profile | `:18084` | 20 × 30s | **324 ms** | **0%** | health + dashboard overview |
+| local docker | `:8081` | — | _pending-local_ | — | `docker compose up` 后同上命令 |
+
+```powershell
+docker run --rm `
+  -e BASE_URL=http://host.docker.internal:18084 `
+  -e VUS=20 -e DURATION=30s `
+  -v D:/project-hub/ai-service-agent/performance:/scripts `
+  grafana/k6:latest run /scripts/k6-smoke.js
+```
+
+### 截图归档（pending-local）
+
+`_optimization-screenshots/ai-service-agent/` 待 Playwright/UI 脚本出图（需 `:18085` 前端栈运行）。
+
+## SSE Chat Soak（2026-07-06）
+
+脚本：`performance/k6-sse-chat-soak.js`
+
+覆盖：`POST /api/chat`（Mock LLM · SSE 流式），断言 `event:start` + `event:done`。
+
+| 环境 | BASE | VU × 时长 | P95 (sse) | 失败率 | 迭代 | 备注 |
+| --- | --- | --- | --- | --- | --- | --- |
+| Hub Profile (Round-6) | `:18084` | 5 × 30s | **1.22 s** | **0%** | 62 | project-hub-2 复跑 · checks 248/248 |
+| Hub Profile | `:18084` | 5 × 30s | **2.6 s** | **0%** | 77 | checks 308/308 |
+| local docker | `:8081` | — | _pending-local_ | — | — | 同上命令 |
+
+```powershell
+docker run --rm `
+  -e BASE_URL=http://host.docker.internal:18084 `
+  -e VUS=5 -e DURATION=30s `
+  -v D:/project-hub/ai-service-agent/performance:/scripts `
+  grafana/k6:latest run /scripts/k6-sse-chat-soak.js
+```
+
+阈值：`http_req_duration{type:sse} p(95)<10s` · `checks>98%`（不纳入只读 smoke 的 800ms 阈值）。
+
+## RBAC Roadmap（P2）
+
+应用层认证与单租户角色规划见 [docs/RBAC-ROADMAP.md](docs/RBAC-ROADMAP.md)（Phase 1 鉴权骨架 · 权限矩阵 · 验收命令）。
+
 ## 后续优化
 
-- [ ] 对 `/api/chat` SSE 端点增加独立 soak 测试（含 Mock LLM）
+- [x] 对 `/api/chat` SSE 端点增加独立 soak 测试（含 Mock LLM）→ `performance/k6-sse-chat-soak.js`
+- [x] 将 k6 smoke + SSE soak 纳入 CI（`docker-smoke` job）
 - [ ] 生产环境在网关层增加分布式限流与 OpenTelemetry 指标
 - [ ] 坐席 WebSocket 连接数与广播延迟专项压测
-- [ ] 将 k6 smoke 纳入 CI（后端 smoke 容器 + `grafana/k6` job）

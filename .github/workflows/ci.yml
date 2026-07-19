@@ -93,6 +93,27 @@ jobs:
           curl -sf -o /dev/null "http://localhost:18085/"
           echo "Docker smoke PASSED (mock LLM, 18084/18085)"
 
+      - name: k6 read smoke (host port)
+        run: |
+          docker run --rm \
+            -e BASE_URL=http://host.docker.internal:18084 \
+            -e VUS=10 \
+            -e DURATION=20s \
+            -v "${{ github.workspace }}/performance:/scripts" \
+            --add-host=host.docker.internal:host-gateway \
+            grafana/k6:latest run /scripts/k6-smoke.js
+
+      - name: k6 SSE chat soak (Mock LLM)
+        run: |
+          docker run --rm \
+            -e BASE_URL=http://host.docker.internal:18084 \
+            -e VUS=3 \
+            -e DURATION=15s \
+            -e THINK_TIME_SECONDS=1 \
+            -v "${{ github.workspace }}/performance:/scripts" \
+            --add-host=host.docker.internal:host-gateway \
+            grafana/k6:latest run /scripts/k6-sse-chat-soak.js
+
       - name: Tear down
         if: always()
         run: docker compose down -v

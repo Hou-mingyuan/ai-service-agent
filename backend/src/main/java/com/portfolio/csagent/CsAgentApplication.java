@@ -7,10 +7,11 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.scheduling.annotation.EnableAsync;
 
 import com.portfolio.csagent.config.AppProperties;
+import com.portfolio.csagent.security.SecurityProperties;
 
 @SpringBootApplication
 @EnableAsync
-@EnableConfigurationProperties(AppProperties.class)
+@EnableConfigurationProperties({AppProperties.class, SecurityProperties.class})
 @MapperScan("com.portfolio.csagent.mapper")
 public class CsAgentApplication {
 

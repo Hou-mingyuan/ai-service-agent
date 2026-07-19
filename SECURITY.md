@@ -28,10 +28,11 @@ Include affected version/commit, reproduction steps, impact, and relevant logs w
 - Docker Compose deployment and default credentials
 - LLM gateway configuration and secret handling
 - Mock demo data leakage or misconfiguration in production
+- **RBAC Phase 1 skeleton**（`Role`/`Permission`、`SecurityConfig`、JWT login）— 默认关闭，生产设 `APP_SECURITY_RBAC_ENABLED=true`
 
 ### Out of scope (current release)
 
-- End-user / agent RBAC and audit logging (see README Roadmap)
+- RBAC Phase 2+（坐席工单隔离、审计日志）→ [docs/RBAC-ROADMAP.md](docs/RBAC-ROADMAP.md)
 - Third-party LLM provider security posture
 
 ## Production Baseline

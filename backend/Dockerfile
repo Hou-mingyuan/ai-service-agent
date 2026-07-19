@@ -9,6 +9,7 @@ RUN mvn -q -B clean package -DskipTests
 # ---- 运行阶段 ----
 FROM eclipse-temurin:17-jre-alpine
 WORKDIR /app
+RUN apk add --no-cache wget
 COPY --from=build /app/target/ai-service-agent.jar app.jar
 EXPOSE 8080
 ENV JAVA_OPTS=""
