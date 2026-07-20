@@ -6,6 +6,8 @@
 # --- 构建产物 ---
 backend/target/
 _optimization-screenshots/
+.playwright-cli/
+output/playwright/
 
 # --- Java / Maven ---
 target/

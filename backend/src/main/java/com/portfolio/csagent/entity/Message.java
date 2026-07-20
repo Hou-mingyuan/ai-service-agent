@@ -16,13 +16,21 @@ public class Message {
     @TableId(type = IdType.AUTO)
     private Long id;
 
+    private String tenantId;
     private Long conversationId;
+    private String clientMessageId;
     /** user / assistant / tool / agent / system */
     private String role;
+    private String senderUsername;
+    private String senderName;
     private String content;
+    private String deliveryStatus;
+    private LocalDateTime readAt;
     private String intent;
+    private BigDecimal intentConfidence;
     private String sentiment;
     private BigDecimal sentimentScore;
+    private String classificationSource;
     private String toolName;
     private String toolArgs;
     private String toolResult;

@@ -7,6 +7,8 @@ import java.util.Map;
 import java.util.function.Consumer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.time.LocalDate;
+import java.time.DayOfWeek;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.portfolio.csagent.agent.tool.ToolNames;
@@ -45,7 +47,7 @@ public class MockLlmClient implements LlmClient {
         if (chosen == null) {
             return LlmChatResult.text("");
         }
-        Map<String, Object> args = buildArgs(chosen, text);
+        Map<String, Object> args = buildArgs(chosen, text, request);
         String argJson;
         try {
             argJson = om.writeValueAsString(args);
@@ -97,16 +99,21 @@ public class MockLlmClient implements LlmClient {
         return null;
     }
 
-    private Map<String, Object> buildArgs(String tool, String text) {
+    private Map<String, Object> buildArgs(String tool, String text, LlmChatRequest request) {
         Map<String, Object> args = new LinkedHashMap<>();
         String code = firstMatch(NUM, text);
+        if (code == null && requiresBusinessReference(tool)) {
+            code = previousBusinessReference(request);
+        }
         switch (tool) {
-            case ToolNames.QUERY_ORDER, ToolNames.QUERY_LOGISTICS -> args.put("order_no", code);
+            case ToolNames.QUERY_ORDER -> args.put("order_no", code);
+            case ToolNames.QUERY_LOGISTICS -> args.put(
+                    containsAny(text, "运单", "tracking") ? "tracking_no" : "order_no", code);
             case ToolNames.QUERY_POLICY -> args.put("policy_no", code);
             case ToolNames.QUERY_TICKET -> args.put("ticket_no", code);
             case ToolNames.RESCHEDULE -> {
-                args.put("order_no", code);
-                args.put("new_date", firstMatch(DATE, text));
+                args.put(isPolicyReference(text, request) ? "policy_no" : "order_no", code);
+                args.put("new_date", resolveDate(firstMatch(DATE, text)));
             }
             case ToolNames.CREATE_TICKET -> {
                 args.put("category", containsAny(text, "投诉", "差评", "曝光") ? "COMPLAINT" : "OTHER");
@@ -117,6 +124,44 @@ public class MockLlmClient implements LlmClient {
             }
         }
         return args;
+    }
+
+    private boolean requiresBusinessReference(String tool) {
+        return ToolNames.QUERY_ORDER.equals(tool) || ToolNames.QUERY_LOGISTICS.equals(tool)
+                || ToolNames.QUERY_POLICY.equals(tool) || ToolNames.RESCHEDULE.equals(tool);
+    }
+
+    private String previousBusinessReference(LlmChatRequest request) {
+        boolean skippedCurrent = false;
+        for (int i = request.getMessages().size() - 1; i >= 0; i--) {
+            ChatMsg message = request.getMessages().get(i);
+            if (!"user".equals(message.getRole())) {
+                continue;
+            }
+            if (!skippedCurrent) {
+                skippedCurrent = true;
+                continue;
+            }
+            String match = firstMatch(NUM, message.getContent());
+            if (match != null) {
+                return match;
+            }
+        }
+        return null;
+    }
+
+    private boolean isPolicyReference(String text, LlmChatRequest request) {
+        if (containsAny(text, "保单", "保险", "policy")) {
+            return true;
+        }
+        for (int i = request.getMessages().size() - 1; i >= 0; i--) {
+            ChatMsg message = request.getMessages().get(i);
+            if ("user".equals(message.getRole())
+                    && containsAny(message.getContent(), "保单", "保险", "policy")) {
+                return true;
+            }
+        }
+        return false;
     }
 
     // ---------------- 收尾答复 ----------------
@@ -132,9 +177,9 @@ public class MockLlmClient implements LlmClient {
         }
         for (ChatMsg m : request.getMessages()) {
             if ("system".equals(m.getRole()) && m.getContent() != null
-                    && m.getContent().startsWith("FAQ_CONTEXT:")) {
-                return m.getContent().substring("FAQ_CONTEXT:".length()).trim()
-                        + "\n\n如未能解决您的问题，可以回复「转人工」由人工坐席为您跟进。";
+                    && m.getContent().startsWith("KNOWLEDGE_CONTEXT:")) {
+                String context = m.getContent().substring("KNOWLEDGE_CONTEXT:".length()).trim();
+                return context + "\n\n以上内容来自已标注来源的本地知识库；如仍未解决，可以申请人工坐席。";
             }
         }
         String user = lastUser(request);
@@ -188,5 +233,30 @@ public class MockLlmClient implements LlmClient {
         }
         Matcher m = p.matcher(text);
         return m.find() ? m.group(1) : null;
+    }
+
+    private String resolveDate(String raw) {
+        if (raw == null) {
+            return null;
+        }
+        if (raw.matches("\\d{4}-\\d{1,2}-\\d{1,2}")) {
+            String[] parts = raw.split("-");
+            return LocalDate.of(Integer.parseInt(parts[0]), Integer.parseInt(parts[1]),
+                    Integer.parseInt(parts[2])).toString();
+        }
+        if ("明天".equals(raw)) {
+            return LocalDate.now().plusDays(1).toString();
+        }
+        if ("后天".equals(raw)) {
+            return LocalDate.now().plusDays(2).toString();
+        }
+        if (raw.startsWith("下周")) {
+            String days = "一二三四五六日天";
+            int index = days.indexOf(raw.charAt(raw.length() - 1));
+            int target = index < 0 ? 1 : Math.min(index + 1, 7);
+            LocalDate date = LocalDate.now().plusWeeks(1).with(DayOfWeek.of(target));
+            return date.toString();
+        }
+        return raw;
     }
 }

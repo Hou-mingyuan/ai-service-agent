@@ -1,12 +1,10 @@
 package com.portfolio.csagent.agent;
 
-/**
- * 情绪识别结果。
- *
- * @param sentiment 情绪极性
- * @param score     负面强度 0~1（越大越负面），用于触发自动升级 / 转人工
- */
-public record EmotionResult(Sentiment sentiment, double score) {
+/** score is negative intensity; confidence is classifier confidence. */
+public record EmotionResult(Sentiment sentiment, double score, double confidence, String source) {
+    public EmotionResult(Sentiment sentiment, double score) {
+        this(sentiment, score, 0.9, "rules");
+    }
 
     public boolean isNegative() {
         return sentiment == Sentiment.NEGATIVE;

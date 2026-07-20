@@ -4,8 +4,9 @@ services:
   mysql:
     image: mysql:8.0
     restart: unless-stopped
-    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    command: --port=19042 --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
     environment:
+      TZ: Asia/Shanghai
       MYSQL_DATABASE: ai_service_agent
       MYSQL_USER: csagent
       MYSQL_PASSWORD: csagentpwd
@@ -13,20 +14,28 @@ services:
     volumes:
       - mysqldata:/var/lib/mysql
     healthcheck:
-      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -ucsagent -pcsagentpwd || exit 1"]
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -P19042 -ucsagent -pcsagentpwd || exit 1"]
       interval: 5s
       timeout: 5s
       retries: 20
+    ports:
+      - "${MYSQL_HOST_PORT:-19042}:19042"
 
   backend:
-    build: ./backend
+    build:
+      context: ./backend
+      args:
+        MAVEN_MIRROR_URL: ${MAVEN_MIRROR_URL:-}
     restart: unless-stopped
     depends_on:
       mysql:
         condition: service_healthy
     environment:
+      TZ: Asia/Shanghai
       SPRING_PROFILES_ACTIVE: mysql
-      DATABASE_URL: jdbc:mysql://mysql:3306/ai_service_agent?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+      APP_TIME_ZONE: Asia/Shanghai
+      SERVER_PORT: 19040
+      DATABASE_URL: jdbc:mysql://mysql:19042/ai_service_agent?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
       DATABASE_USERNAME: csagent
       DATABASE_PASSWORD: csagentpwd
       LLM_PROVIDER: ${LLM_PROVIDER:-mock}
@@ -34,18 +43,30 @@ services:
       LLM_MODEL: ${LLM_MODEL:-gpt-4o-mini}
       LLM_API_KEY: ${LLM_API_KEY:-}
       LLM_TEMPERATURE: ${LLM_TEMPERATURE:-0.3}
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:19040/api/health | grep -q '\"status\":\"UP\"' || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 24
+      start_period: 15s
     ports:
-      - "${BACKEND_HOST_PORT:-8081}:8080"
+      - "${BACKEND_HOST_PORT:-19040}:19040"
 
   frontend:
     build: ./frontend
     restart: unless-stopped
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     environment:
       BACKEND_HOST: backend
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:19041/ || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
     ports:
-      - "${FRONTEND_HOST_PORT:-8080}:80"
+      - "${FRONTEND_HOST_PORT:-19041}:19041"
 
 volumes:
   mysqldata:

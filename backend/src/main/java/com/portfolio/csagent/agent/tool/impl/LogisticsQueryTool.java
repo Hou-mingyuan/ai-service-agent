@@ -3,71 +3,52 @@ package com.portfolio.csagent.agent.tool.impl;
 import java.util.List;
 import java.util.Map;
 
-import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.portfolio.csagent.adapter.business.BusinessSystemAdapter;
 import com.portfolio.csagent.agent.tool.AgentTool;
+import com.portfolio.csagent.agent.tool.ToolExecutionContext;
 import com.portfolio.csagent.agent.tool.ToolNames;
 import com.portfolio.csagent.agent.tool.ToolResult;
 import com.portfolio.csagent.agent.tool.ToolSupport;
-import com.portfolio.csagent.entity.Shipment;
 import com.portfolio.csagent.llm.ToolSpec;
-import com.portfolio.csagent.mapper.ShipmentMapper;
 import org.springframework.stereotype.Component;
 
 @Component
 public class LogisticsQueryTool implements AgentTool {
+    private final BusinessSystemAdapter adapter;
 
-    private final ShipmentMapper shipmentMapper;
-
-    public LogisticsQueryTool(ShipmentMapper shipmentMapper) {
-        this.shipmentMapper = shipmentMapper;
+    public LogisticsQueryTool(BusinessSystemAdapter adapter) {
+        this.adapter = adapter;
     }
 
-    @Override
-    public String name() {
-        return ToolNames.QUERY_LOGISTICS;
-    }
+    @Override public String name() { return ToolNames.QUERY_LOGISTICS; }
 
     @Override
     public ToolSpec spec() {
-        return new ToolSpec(name(), "根据订单号或运单号查询物流轨迹与配送状态",
-                ToolSupport.schema(
-                        Map.of(
-                                "order_no", ToolSupport.prop("string", "订单号"),
-                                "tracking_no", ToolSupport.prop("string", "运单号（可选）")),
-                        List.of("order_no")));
+        return new ToolSpec(name(), "按当前客户权限查询物流轨迹",
+                ToolSupport.schema(Map.of(
+                        "order_no", ToolSupport.prop("string", "订单号，可与运单号二选一"),
+                        "tracking_no", ToolSupport.prop("string", "运单号，可与订单号二选一")), List.of()));
     }
 
     @Override
-    public ToolResult execute(Map<String, Object> args) {
-        String orderNo = ToolSupport.str(args, "order_no");
-        String trackingNo = ToolSupport.str(args, "tracking_no");
-        if (orderNo == null && trackingNo == null) {
-            return ToolResult.fail("请提供订单号或运单号以查询物流。");
+    public void validate(ToolExecutionContext context, Map<String, Object> args) {
+        if (ToolSupport.str(args, "order_no") == null && ToolSupport.str(args, "tracking_no") == null) {
+            throw new com.portfolio.csagent.common.BizException(400, "请提供订单号或运单号");
         }
-        Shipment s = shipmentMapper.selectOne(Wrappers.<Shipment>lambdaQuery()
-                .eq(orderNo != null, Shipment::getOrderNo, orderNo)
-                .eq(trackingNo != null, Shipment::getTrackingNo, trackingNo)
-                .last("limit 1"));
-        if (s == null) {
-            return ToolResult.fail("未查询到订单「" + (orderNo != null ? orderNo : trackingNo)
-                    + "」的物流信息，可能尚未发货。");
-        }
-        String summary = String.format("订单 %s 物流：%s，运单号 %s，当前状态：%s，最新位置：%s。",
-                s.getOrderNo(), s.getCarrier(), s.getTrackingNo(), statusCn(s.getStatus()),
-                s.getLastLocation());
-        return ToolResult.ok(summary, s);
     }
 
-    private String statusCn(String s) {
-        if (s == null) {
-            return "未知";
-        }
-        return switch (s) {
-            case "PENDING" -> "待揽收";
-            case "IN_TRANSIT" -> "运输中";
-            case "OUT_FOR_DELIVERY" -> "派送中";
-            case "SIGNED" -> "已签收";
-            default -> s;
-        };
+    @Override
+    public ToolResult execute(ToolExecutionContext context, Map<String, Object> args) {
+        String orderNo = ToolSupport.str(args, "order_no");
+        String trackingNo = ToolSupport.str(args, "tracking_no");
+        return adapter.findShipment(context.actor().tenantId(), context.conversation().getCustomerUsername(),
+                        orderNo, trackingNo)
+                .map(shipment -> ToolResult.ok(String.format(
+                        "订单 %s 由 %s 承运，运单号 %s，状态：%s，最新位置：%s。",
+                        shipment.orderNo(), shipment.carrier(), shipment.trackingNo(),
+                        shipment.status(), shipment.lastLocation()), shipment))
+                .orElseGet(() -> ToolResult.fail("未找到该客户名下的物流记录。"));
     }
+
+    @Override public String adapterSource() { return adapter.source(); }
 }

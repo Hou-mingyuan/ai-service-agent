@@ -2,39 +2,57 @@ package com.portfolio.csagent.security;
 
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.EnumSet;
 import java.util.Set;
 import java.util.stream.Collectors;
 
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 
-/**
- * 单租户角色枚举。{@link #getAuthorities()} 返回 Spring Security 可用的 authority 集合。
- */
 public enum Role {
-
-    VISITOR("visitor", Permission.CHAT_SEND, Permission.FEEDBACK_SUBMIT),
+    CUSTOMER("customer",
+            Permission.CHAT_SEND,
+            Permission.FEEDBACK_SUBMIT,
+            Permission.CONVERSATION_SELF,
+            Permission.TOOL_READ,
+            Permission.TOOL_SENSITIVE,
+            Permission.WS_EVENTS),
     AGENT("agent",
+            Permission.CONVERSATION_QUEUE,
+            Permission.MESSAGE_REPLY,
             Permission.TICKET_READ,
             Permission.TICKET_TRANSITION,
-            Permission.WS_AGENT),
+            Permission.TOOL_READ,
+            Permission.WS_EVENTS),
     SUPERVISOR("supervisor",
+            Permission.CONVERSATION_QUEUE,
+            Permission.CONVERSATION_ALL,
+            Permission.MESSAGE_REPLY,
             Permission.TICKET_READ,
             Permission.TICKET_TRANSITION,
             Permission.TICKET_ASSIGN,
             Permission.TICKET_ESCALATE,
+            Permission.TOOL_READ,
+            Permission.KNOWLEDGE_READ,
             Permission.DASHBOARD_READ,
-            Permission.WS_AGENT),
+            Permission.AUDIT_READ,
+            Permission.WS_EVENTS),
     ADMIN("admin",
             Permission.CHAT_SEND,
             Permission.FEEDBACK_SUBMIT,
+            Permission.CONVERSATION_SELF,
+            Permission.CONVERSATION_QUEUE,
+            Permission.CONVERSATION_ALL,
+            Permission.MESSAGE_REPLY,
             Permission.TICKET_READ,
             Permission.TICKET_TRANSITION,
             Permission.TICKET_ASSIGN,
             Permission.TICKET_ESCALATE,
+            Permission.TOOL_READ,
+            Permission.TOOL_SENSITIVE,
+            Permission.KNOWLEDGE_READ,
+            Permission.KNOWLEDGE_WRITE,
             Permission.DASHBOARD_READ,
-            Permission.WS_AGENT,
-            Permission.CATALOG_WRITE,
+            Permission.AUDIT_READ,
+            Permission.WS_EVENTS,
             Permission.CONFIG_WRITE);
 
     private final String id;
@@ -54,30 +72,21 @@ public enum Role {
     }
 
     public Set<SimpleGrantedAuthority> getAuthorities() {
-        return permissions.stream()
-                .map(SimpleGrantedAuthority::new)
-                .collect(Collectors.toUnmodifiableSet());
+        return permissions.stream().map(SimpleGrantedAuthority::new).collect(Collectors.toUnmodifiableSet());
     }
 
     public static Role fromId(String id) {
-        if (id == null || id.isBlank()) {
+        if (id == null) {
             return null;
         }
-        for (Role role : values()) {
-            if (role.id.equalsIgnoreCase(id)) {
-                return role;
-            }
-        }
-        return null;
+        return Arrays.stream(values()).filter(role -> role.id.equalsIgnoreCase(id)).findFirst().orElse(null);
     }
 
-    /** agent 及以上角色可访问坐席 API。 */
-    public boolean isAgentOrAbove() {
-        return EnumSet.of(AGENT, SUPERVISOR, ADMIN).contains(this);
+    public boolean isStaff() {
+        return this != CUSTOMER;
     }
 
-    /** supervisor 及以上角色可访问运营看板。 */
     public boolean isSupervisorOrAbove() {
-        return EnumSet.of(SUPERVISOR, ADMIN).contains(this);
+        return this == SUPERVISOR || this == ADMIN;
     }
 }

@@ -1,26 +1,22 @@
 package com.portfolio.csagent.controller;
 
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-
-import com.baomidou.mybatisplus.core.toolkit.StringUtils;
-import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.portfolio.csagent.common.ApiResponse;
-import com.portfolio.csagent.common.BizException;
 import com.portfolio.csagent.dto.TicketAssignRequest;
 import com.portfolio.csagent.dto.TicketCreateRequest;
+import com.portfolio.csagent.dto.TicketReopenRequest;
 import com.portfolio.csagent.dto.TicketTransitionRequest;
 import com.portfolio.csagent.entity.Ticket;
-import com.portfolio.csagent.entity.TicketEvent;
-import com.portfolio.csagent.mapper.TicketEventMapper;
-import com.portfolio.csagent.mapper.TicketMapper;
+import com.portfolio.csagent.security.CurrentActor;
+import com.portfolio.csagent.security.Permission;
 import com.portfolio.csagent.service.TicketService;
 import jakarta.validation.Valid;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -28,66 +24,64 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/tickets")
 public class TicketController {
-
     private final TicketService ticketService;
-    private final TicketMapper ticketMapper;
-    private final TicketEventMapper ticketEventMapper;
+    private final CurrentActor currentActor;
 
-    public TicketController(TicketService ticketService, TicketMapper ticketMapper,
-                            TicketEventMapper ticketEventMapper) {
+    public TicketController(TicketService ticketService, CurrentActor currentActor) {
         this.ticketService = ticketService;
-        this.ticketMapper = ticketMapper;
-        this.ticketEventMapper = ticketEventMapper;
+        this.currentActor = currentActor;
     }
 
     @GetMapping
-    public ApiResponse<List<Ticket>> list(@RequestParam(required = false) String status,
-                                          @RequestParam(required = false) String category,
-                                          @RequestParam(defaultValue = "100") int limit) {
-        List<Ticket> list = ticketMapper.selectList(Wrappers.<Ticket>lambdaQuery()
-                .eq(StringUtils.isNotBlank(status), Ticket::getStatus, status)
-                .eq(StringUtils.isNotBlank(category), Ticket::getCategory, category)
-                .orderByDesc(Ticket::getId)
-                .last("limit " + Math.max(1, limit)));
-        return ApiResponse.ok(list);
+    @PreAuthorize("hasAuthority('" + Permission.TICKET_READ + "')")
+    public ApiResponse<IPage<Ticket>> list(@RequestParam(required = false) String status,
+                                           @RequestParam(required = false) String category,
+                                           @RequestParam(defaultValue = "1") int page,
+                                           @RequestParam(defaultValue = "30") int size) {
+        return ApiResponse.ok(ticketService.page(status, category, page, size));
     }
 
     @GetMapping("/{id}")
-    public ApiResponse<Map<String, Object>> detail(@PathVariable Long id) {
-        Ticket t = ticketMapper.selectById(id);
-        if (t == null) {
-            throw new BizException(404, "工单不存在：" + id);
-        }
-        List<TicketEvent> events = ticketEventMapper.selectList(Wrappers.<TicketEvent>lambdaQuery()
-                .eq(TicketEvent::getTicketId, id).orderByAsc(TicketEvent::getId));
-        Map<String, Object> map = new LinkedHashMap<>();
-        map.put("ticket", t);
-        map.put("events", events);
-        return ApiResponse.ok(map);
-    }
-
-    @GetMapping("/{id}/events")
-    public ApiResponse<List<TicketEvent>> events(@PathVariable Long id) {
-        return ApiResponse.ok(ticketEventMapper.selectList(Wrappers.<TicketEvent>lambdaQuery()
-                .eq(TicketEvent::getTicketId, id).orderByAsc(TicketEvent::getId)));
+    @PreAuthorize("hasAuthority('" + Permission.TICKET_READ + "')")
+    public ApiResponse<TicketService.TicketDetails> detail(@PathVariable Long id) {
+        return ApiResponse.ok(ticketService.detail(id));
     }
 
     @PostMapping
-    public ApiResponse<Ticket> create(@Valid @RequestBody TicketCreateRequest req) {
-        return ApiResponse.ok(ticketService.create(req.getConversationId(), req.getCategory(),
-                req.getTitle(), req.getDescription(), req.getPriority(), "HUMAN", req.getCustomer()));
+    @PreAuthorize("hasAuthority('" + Permission.TICKET_TRANSITION + "')")
+    public ApiResponse<TicketService.CreateResult> create(
+            @RequestHeader("Idempotency-Key") String idempotencyKey,
+            @Valid @RequestBody TicketCreateRequest request) {
+        return ApiResponse.ok(ticketService.createManual(currentActor.require(), request.getConversationId(),
+                request.getCategory(), request.getTitle(), request.getDescription(), request.getPriority(),
+                idempotencyKey));
     }
 
-    @PostMapping("/{id}/transition")
-    public ApiResponse<Ticket> transition(@PathVariable Long id,
-                                          @Valid @RequestBody TicketTransitionRequest req) {
-        return ApiResponse.ok(ticketService.transition(
-                id, req.getToStatus(), req.getOperator(), req.getNote()));
+    @PostMapping("/{id}/claim")
+    @PreAuthorize("hasAuthority('" + Permission.TICKET_READ + "')")
+    public ApiResponse<Ticket> claim(@PathVariable Long id) {
+        return ApiResponse.ok(ticketService.claim(id, null));
     }
 
     @PostMapping("/{id}/assign")
+    @PreAuthorize("hasAuthority('" + Permission.TICKET_ASSIGN + "')")
     public ApiResponse<Ticket> assign(@PathVariable Long id,
-                                      @Valid @RequestBody TicketAssignRequest req) {
-        return ApiResponse.ok(ticketService.assign(id, req.getAssignee()));
+                                      @Valid @RequestBody TicketAssignRequest request) {
+        return ApiResponse.ok(ticketService.claim(id, request.getAssignee()));
+    }
+
+    @PostMapping("/{id}/transition")
+    @PreAuthorize("hasAuthority('" + Permission.TICKET_TRANSITION + "')")
+    public ApiResponse<Ticket> transition(@PathVariable Long id,
+                                           @Valid @RequestBody TicketTransitionRequest request) {
+        return ApiResponse.ok(ticketService.transition(id, request.getToStatus(), request.getNote(),
+                request.getCloseReason()));
+    }
+
+    @PostMapping("/{id}/reopen")
+    @PreAuthorize("hasAuthority('" + Permission.TICKET_TRANSITION + "')")
+    public ApiResponse<Ticket> reopen(@PathVariable Long id,
+                                      @Valid @RequestBody TicketReopenRequest request) {
+        return ApiResponse.ok(ticketService.reopen(id, request.reason()));
     }
 }

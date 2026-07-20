@@ -1,14 +1,19 @@
 package com.portfolio.csagent.dto;
 
-import lombok.AllArgsConstructor;
-import lombok.Data;
+import java.util.Set;
 
-@Data
-@AllArgsConstructor
-public class LoginResponse {
+import com.portfolio.csagent.security.AuthenticatedUser;
 
-    private String accessToken;
-    private String tokenType;
-    private String role;
-    private long expiresInMinutes;
+public record LoginResponse(
+        String accessToken,
+        String tokenType,
+        String username,
+        String displayName,
+        String role,
+        Set<String> permissions,
+        long expiresInMinutes) {
+    public static LoginResponse from(AuthenticatedUser user, String token, long expiresInMinutes) {
+        return new LoginResponse(token, "Bearer", user.username(), user.displayName(), user.role().getId(),
+                user.role().getPermissions(), expiresInMinutes);
+    }
 }
