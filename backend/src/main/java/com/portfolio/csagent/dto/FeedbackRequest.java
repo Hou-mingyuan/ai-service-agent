@@ -4,6 +4,7 @@ import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
+import jakarta.validation.constraints.Size;
 
 @Data
 public class FeedbackRequest {
@@ -16,5 +17,6 @@ public class FeedbackRequest {
     @Max(value = 5, message = "评分最大为5")
     private Integer rating;
 
+    @Size(max = 512, message = "评价内容不能超过512字符")
     private String comment;
 }

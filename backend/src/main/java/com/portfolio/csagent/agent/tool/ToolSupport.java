@@ -26,7 +26,20 @@ public final class ToolSupport {
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("type", type);
         m.put("description", description);
+        m.put("maxLength", 255);
         return m;
+    }
+
+    public static Map<String, Object> enumProp(String description, List<String> values) {
+        Map<String, Object> property = prop("string", description);
+        property.put("enum", values);
+        return property;
+    }
+
+    public static Map<String, Object> dateProp(String description) {
+        Map<String, Object> property = prop("string", description);
+        property.put("pattern", "\\d{4}-\\d{2}-\\d{2}");
+        return property;
     }
 
     public static Map<String, Object> schema(Map<String, Object> properties, List<String> required) {
@@ -34,6 +47,7 @@ public final class ToolSupport {
         m.put("type", "object");
         m.put("properties", properties);
         m.put("required", required);
+        m.put("additionalProperties", false);
         return m;
     }
 }

@@ -16,6 +16,8 @@ public class OrderInfo {
     @TableId(type = IdType.AUTO)
     private Long id;
 
+    private String tenantId;
+    private String ownerUsername;
     private String orderNo;
     private String customer;
     private String product;
@@ -23,5 +25,6 @@ public class OrderInfo {
     /** PAID / SHIPPED / DELIVERED / REFUNDING / CANCELLED */
     private String status;
     private String address;
+    private String adapterSource;
     private LocalDateTime createdAt;
 }

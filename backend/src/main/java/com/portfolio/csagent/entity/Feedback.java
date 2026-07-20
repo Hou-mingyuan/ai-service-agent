@@ -15,7 +15,9 @@ public class Feedback {
     @TableId(type = IdType.AUTO)
     private Long id;
 
+    private String tenantId;
     private Long conversationId;
+    private String customerUsername;
     private Integer rating;
     private String comment;
     private LocalDateTime createdAt;

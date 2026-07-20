@@ -1,12 +1,16 @@
 package com.portfolio.csagent.agent;
 
-import com.portfolio.csagent.entity.Ticket;
+import java.util.List;
 
-/** 一轮 Agent 处理的结果汇总。 */
+import com.portfolio.csagent.entity.Ticket;
+import com.portfolio.csagent.service.KnowledgeSearchResult;
+
 public record AgentReply(
         String answer,
         Intent intent,
+        double intentConfidence,
         EmotionResult emotion,
         Ticket ticket,
-        boolean handoff) {
+        boolean handoff,
+        List<KnowledgeSearchResult> citations) {
 }

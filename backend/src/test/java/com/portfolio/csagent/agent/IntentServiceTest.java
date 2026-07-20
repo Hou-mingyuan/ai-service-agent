@@ -36,6 +36,7 @@ class IntentServiceTest {
     void detectGreetingFaqOther() {
         assertEquals(Intent.GREETING, service.detect("你好"));
         assertEquals(Intent.FAQ, service.detect("退货政策是怎样的"));
+        assertEquals(Intent.FAQ, service.detect("退货需要满足什么条件？"));
         assertEquals(Intent.OTHER, service.detect("嗯嗯"));
     }
 }

@@ -15,11 +15,14 @@ public class Shipment {
     @TableId(type = IdType.AUTO)
     private Long id;
 
+    private String tenantId;
+    private String ownerUsername;
     private String orderNo;
     private String trackingNo;
     private String carrier;
     /** PENDING / IN_TRANSIT / OUT_FOR_DELIVERY / SIGNED */
     private String status;
     private String lastLocation;
+    private String adapterSource;
     private LocalDateTime updatedAt;
 }

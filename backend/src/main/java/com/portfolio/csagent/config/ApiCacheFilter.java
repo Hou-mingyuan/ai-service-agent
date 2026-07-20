@@ -39,7 +39,7 @@ public class ApiCacheFilter extends OncePerRequestFilter {
         if (path.startsWith("/api/catalog") || path.startsWith("/api/faq")) {
             response.setHeader("Cache-Control", "public, max-age=300, stale-while-revalidate=60");
         } else if (path.startsWith("/api/dashboard")) {
-            response.setHeader("Cache-Control", "private, max-age=30");
+            response.setHeader("Cache-Control", "no-store");
         } else if (path.startsWith("/api/tickets")) {
             response.setHeader("Cache-Control", "no-cache, must-revalidate");
         } else if (path.startsWith("/api/health")) {

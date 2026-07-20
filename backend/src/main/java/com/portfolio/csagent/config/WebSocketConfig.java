@@ -7,6 +7,7 @@ import org.springframework.web.socket.config.annotation.WebSocketHandlerRegistry
 
 import com.portfolio.csagent.ws.AgentEventSocketHandler;
 import com.portfolio.csagent.ws.AgentWebSocketAuthInterceptor;
+import com.portfolio.csagent.config.AppProperties;
 
 @Configuration
 @EnableWebSocket
@@ -14,17 +15,20 @@ public class WebSocketConfig implements WebSocketConfigurer {
 
     private final AgentEventSocketHandler agentEventSocketHandler;
     private final AgentWebSocketAuthInterceptor agentWebSocketAuthInterceptor;
+    private final AppProperties appProperties;
 
     public WebSocketConfig(AgentEventSocketHandler agentEventSocketHandler,
-                           AgentWebSocketAuthInterceptor agentWebSocketAuthInterceptor) {
+                           AgentWebSocketAuthInterceptor agentWebSocketAuthInterceptor,
+                           AppProperties appProperties) {
         this.agentEventSocketHandler = agentEventSocketHandler;
         this.agentWebSocketAuthInterceptor = agentWebSocketAuthInterceptor;
+        this.appProperties = appProperties;
     }
 
     @Override
     public void registerWebSocketHandlers(WebSocketHandlerRegistry registry) {
-        registry.addHandler(agentEventSocketHandler, "/ws/agent")
+        registry.addHandler(agentEventSocketHandler, "/ws/events")
                 .addInterceptors(agentWebSocketAuthInterceptor)
-                .setAllowedOriginPatterns("*");
+                .setAllowedOrigins(appProperties.getCors().getAllowedOrigins().split(","));
     }
 }

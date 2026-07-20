@@ -35,13 +35,16 @@ class SecurityRbacTest {
     @Autowired
     private JwtService jwtService;
 
+    @Autowired
+    private UserService userService;
+
     private String agentToken;
     private String supervisorToken;
 
     @BeforeEach
     void setUp() {
-        agentToken = jwtService.createToken("agent", Role.AGENT);
-        supervisorToken = jwtService.createToken("supervisor", Role.SUPERVISOR);
+        agentToken = jwtService.createToken(userService.authenticate("agent", "agent123"));
+        supervisorToken = jwtService.createToken(userService.authenticate("supervisor", "super123"));
     }
 
     @Test

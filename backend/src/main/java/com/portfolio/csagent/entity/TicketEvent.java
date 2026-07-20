@@ -15,10 +15,15 @@ public class TicketEvent {
     @TableId(type = IdType.AUTO)
     private Long id;
 
+    private String tenantId;
     private Long ticketId;
+    private String eventType;
+    private String eventKey;
     private String fromStatus;
     private String toStatus;
     private String note;
     private String operator;
+    private String actorRole;
+    private String metadataJson;
     private LocalDateTime createdAt;
 }

@@ -11,5 +11,5 @@ FROM nginx:1.27-alpine
 ENV BACKEND_HOST=backend
 COPY nginx.conf.template /etc/nginx/templates/default.conf.template
 COPY --from=build /app/dist /usr/share/nginx/html
-EXPOSE 80
+EXPOSE 19041
 CMD ["nginx", "-g", "daemon off;"]

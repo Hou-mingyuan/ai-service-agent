@@ -16,24 +16,38 @@ export const options = {
   },
 };
 
-const BASE_URL = __ENV.BASE_URL || "http://127.0.0.1:8081";
+const BASE_URL = __ENV.BASE_URL || "http://127.0.0.1:19040";
 const THINK_TIME_SECONDS = Number(__ENV.THINK_TIME_SECONDS || 2);
 
 const PROMPTS = [
   "帮我查订单123",
-  "物流到哪了",
-  "我想改配送时间",
-  "查询保单P20240001",
+  "订单123的物流到哪了",
+  "查询保单PAI2024001",
+  "退货需要满足什么条件",
 ];
 
-export default function () {
+export function setup() {
+  const login = http.post(`${BASE_URL}/api/auth/login`, JSON.stringify({
+    username: __ENV.CUSTOMER_USERNAME || "customer",
+    password: __ENV.CUSTOMER_PASSWORD || "customer123",
+  }), { headers: { "Content-Type": "application/json" } });
+  const ok = check(login, { "customer login ok": (r) => r.status === 200 });
+  if (!ok) throw new Error(`customer login failed: ${login.status}`);
+  return { token: login.json("data.accessToken") };
+}
+
+export default function (session) {
   const message = PROMPTS[__ITER % PROMPTS.length];
-  const payload = JSON.stringify({ message, userName: `k6-vu-${__VU}` });
+  const payload = JSON.stringify({
+    clientMessageId: `k6:${__VU}:${__ITER}:${Date.now()}`,
+    message,
+  });
 
   const res = http.post(`${BASE_URL}/api/chat`, payload, {
     headers: {
       "Content-Type": "application/json",
       Accept: "text/event-stream",
+      Authorization: `Bearer ${session.token}`,
     },
     tags: { type: "sse" },
     timeout: "120s",

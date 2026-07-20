@@ -15,6 +15,8 @@ public class Policy {
     @TableId(type = IdType.AUTO)
     private Long id;
 
+    private String tenantId;
+    private String ownerUsername;
     private String policyNo;
     private String holder;
     private String product;
@@ -24,4 +26,5 @@ public class Policy {
     private String effectiveDate;
     private String expireDate;
     private String nextPaymentDate;
+    private String adapterSource;
 }

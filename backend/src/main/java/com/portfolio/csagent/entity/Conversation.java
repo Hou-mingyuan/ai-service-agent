@@ -5,6 +5,7 @@ import java.time.LocalDateTime;
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
+import com.baomidou.mybatisplus.annotation.Version;
 
 import lombok.Data;
 
@@ -15,14 +16,25 @@ public class Conversation {
     @TableId(type = IdType.AUTO)
     private Long id;
 
+    private String tenantId;
     private String sessionKey;
+    private String customerUsername;
     private String userName;
     private String channel;
     /** BOT / HUMAN_PENDING / HUMAN / CLOSED */
     private String status;
+    private Integer botEnabled;
+    private String assignedAgent;
+    private String handoffReason;
     private String lastIntent;
     private String lastSentiment;
     private Integer resolved;
+    private LocalDateTime handoffAt;
+    private LocalDateTime claimedAt;
+    private LocalDateTime firstResponseAt;
+    private LocalDateTime lastMessageAt;
+    @Version
+    private Integer version;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

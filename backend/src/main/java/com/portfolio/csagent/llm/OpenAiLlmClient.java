@@ -51,7 +51,7 @@ public class OpenAiLlmClient implements LlmClient {
         Map<String, Object> body = buildBody(request, false);
         HttpResponse<String> resp = send(body, false);
         if (resp.statusCode() >= 300) {
-            throw new BizException(502, "LLM 网关返回错误：" + resp.statusCode() + " " + truncate(resp.body()));
+            throw new BizException(502, "LLM 网关暂时不可用（HTTP " + resp.statusCode() + "）");
         }
         try {
             JsonNode root = om.readTree(resp.body());
@@ -72,7 +72,7 @@ public class OpenAiLlmClient implements LlmClient {
             }
             return new LlmChatResult(message.path("content").asText(""), List.of(), finish);
         } catch (Exception e) {
-            throw new BizException(502, "解析 LLM 响应失败：" + e.getMessage());
+            throw new BizException(502, "LLM 网关返回了无法解析的响应");
         }
     }
 
@@ -83,7 +83,7 @@ public class OpenAiLlmClient implements LlmClient {
         try {
             payload = om.writeValueAsString(body);
         } catch (Exception e) {
-            throw new BizException(500, "构造请求失败：" + e.getMessage());
+            throw new BizException(500, "无法构造 LLM 请求");
         }
         HttpRequest httpReq = HttpRequest.newBuilder()
                 .uri(URI.create(endpoint()))
@@ -119,7 +119,7 @@ public class OpenAiLlmClient implements LlmClient {
         } catch (BizException e) {
             throw e;
         } catch (Exception e) {
-            throw new BizException(502, "LLM 流式请求失败：" + e.getMessage());
+            throw new BizException(502, "LLM 流式请求失败");
         }
     }
 
@@ -135,7 +135,7 @@ public class OpenAiLlmClient implements LlmClient {
                     .build();
             return http.send(req, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
         } catch (Exception e) {
-            throw new BizException(502, "LLM 请求失败：" + e.getMessage());
+            throw new BizException(502, "LLM 请求失败");
         }
     }
 
@@ -192,10 +192,4 @@ public class OpenAiLlmClient implements LlmClient {
         return base + "/chat/completions";
     }
 
-    private String truncate(String s) {
-        if (s == null) {
-            return "";
-        }
-        return s.length() > 300 ? s.substring(0, 300) : s;
-    }
 }

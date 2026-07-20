@@ -1,103 +1,121 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
-import { RouterLink, RouterView } from 'vue-router'
-import { api } from './api'
-import { resetDemoWizard } from './demo'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router'
+import {
+  Activity, BarChart3, BookOpen, Bot, ClipboardList, LogOut, Menu, MessagesSquare,
+  ScrollText, ShieldCheck, UserRoundCheck, Wifi, WifiOff, X
+} from '@lucide/vue'
+import { sessionState, hasPermission, logout } from './session'
+import { errorMessage, roleLabels } from './ui'
 
-const nav = [
-  { to: '/chat', label: '智能对话', icon: '💬' },
-  { to: '/tickets', label: '坐席工单', icon: '🎫' },
-  { to: '/dashboard', label: '数据看板', icon: '📊' }
+const route = useRoute()
+const router = useRouter()
+const mobileNav = ref(false)
+const online = ref(navigator.onLine)
+const logoutError = ref('')
+
+const allNav = [
+  { to: '/chat', label: '客户对话', permission: 'chat:send', icon: MessagesSquare },
+  { to: '/workspace', label: '坐席工作台', permission: 'conversation:queue', icon: UserRoundCheck },
+  { to: '/tickets', label: '工单中心', permission: 'ticket:read', icon: ClipboardList },
+  { to: '/knowledge', label: '知识库', permission: 'knowledge:read', icon: BookOpen },
+  { to: '/dashboard', label: '运营看板', permission: 'dashboard:read', icon: BarChart3 },
+  { to: '/audit', label: '审计日志', permission: 'audit:read', icon: ScrollText }
 ]
 
-const llmProvider = ref('')
+const nav = computed(() => allNav.filter((item) => hasPermission(item.permission)))
+const isLogin = computed(() => route.path === '/login')
+const healthTone = computed(() => sessionState.health?.status === 'UP' ? 'success' : 'danger')
 
-onMounted(async () => {
+function setOnline() { online.value = navigator.onLine }
+function handleGlobalKeydown(event: KeyboardEvent) {
+  if (event.key === 'Escape') mobileNav.value = false
+}
+
+async function signOut() {
+  logoutError.value = ''
   try {
-    const h = await api.get<{ llmProvider: string }>('/api/health')
-    llmProvider.value = h.llmProvider
-  } catch {
-    /* ignore */
+    await logout()
+  } catch (error) {
+    logoutError.value = errorMessage(error)
+  } finally {
+    await router.replace('/login')
   }
+}
+
+watch(() => route.fullPath, () => { mobileNav.value = false })
+watch(() => sessionState.user, (user) => {
+  if (!user && route.path !== '/login') void router.replace('/login')
 })
 
-function restartDemo() {
-  resetDemoWizard()
-  location.hash = '#/chat'
-  location.reload()
-}
+onMounted(() => {
+  window.addEventListener('online', setOnline)
+  window.addEventListener('offline', setOnline)
+  window.addEventListener('keydown', handleGlobalKeydown)
+})
+onUnmounted(() => {
+  window.removeEventListener('online', setOnline)
+  window.removeEventListener('offline', setOnline)
+  window.removeEventListener('keydown', handleGlobalKeydown)
+})
 </script>
 
 <template>
-  <div class="app">
+  <div v-if="isLogin" class="public-shell"><RouterView /></div>
+  <div v-else class="app-shell">
     <header class="topbar">
-      <div class="brand">
-        <div class="logo">智</div>
+      <div class="brand-lockup">
+        <div class="brand-mark" aria-hidden="true"><Bot :size="22" /></div>
         <div>
-          <div class="brand-name">智答 · AI 智能客服 / 工单 Agent</div>
-          <div class="brand-sub">
-            对话式客服 · 工具调用 · 工单闭环
-            <span v-if="llmProvider" class="provider-tag">{{ llmProvider === 'mock' ? 'Mock 演示' : llmProvider }}</span>
-          </div>
+          <div class="brand-name">智答服务中枢</div>
+          <div class="brand-caption">AI SERVICE OPERATIONS</div>
         </div>
       </div>
-      <nav class="nav">
-        <RouterLink v-for="n in nav" :key="n.to" :to="n.to" class="nav-item" active-class="active">
-          <span>{{ n.icon }}</span>{{ n.label }}
-        </RouterLink>
-        <button v-if="llmProvider === 'mock'" class="nav-demo" @click="restartDemo" title="重置 Mock 演示向导">
-          🎯 演示
-        </button>
-      </nav>
+
+      <div class="top-status">
+        <span class="source-pill" :class="sessionState.health?.mode === 'DEMO' ? 'is-mock' : 'is-real'">
+          <ShieldCheck :size="14" />
+          {{ sessionState.health?.mode === 'DEMO' ? 'DEMO · MOCK 数据' : 'STANDARD · 真实 Adapter' }}
+        </span>
+        <span class="connection-pill" :class="online ? healthTone : 'danger'">
+          <Wifi v-if="online" :size="14" /><WifiOff v-else :size="14" />
+          {{ online ? (sessionState.health?.status === 'UP' ? '服务在线' : '服务待检') : '网络离线' }}
+        </span>
+        <button class="icon-button mobile-only" aria-label="打开导航" aria-controls="app-sidebar" :aria-expanded="mobileNav" @click="mobileNav = true"><Menu /></button>
+      </div>
     </header>
-    <main class="content">
+
+    <aside id="app-sidebar" class="sidebar" :class="{ open: mobileNav }">
+      <div class="mobile-nav-head">
+        <span>功能导航</span>
+        <button class="icon-button" aria-label="关闭导航" @click="mobileNav = false"><X /></button>
+      </div>
+      <nav class="side-nav" aria-label="主导航">
+        <RouterLink v-for="item in nav" :key="item.to" :to="item.to" class="side-link" active-class="active">
+          <component :is="item.icon" :size="18" />
+          <span>{{ item.label }}</span>
+        </RouterLink>
+      </nav>
+      <div class="side-foot">
+        <div class="operator-card">
+          <span class="operator-avatar">{{ sessionState.user?.displayName.slice(0, 1) }}</span>
+          <div class="operator-copy">
+            <strong>{{ sessionState.user?.displayName }}</strong>
+            <span>{{ roleLabels[sessionState.user?.role || ''] }} · {{ sessionState.user?.username }}</span>
+          </div>
+        </div>
+        <button class="side-link logout-link" @click="signOut"><LogOut :size="18" />退出登录</button>
+        <p v-if="logoutError" class="inline-error">{{ logoutError }}</p>
+      </div>
+    </aside>
+    <button v-if="mobileNav" class="nav-scrim" aria-label="关闭导航" @click="mobileNav = false" />
+
+    <main class="page-frame">
+      <div class="page-context">
+        <div><span class="context-eyebrow">CONTROL DESK</span><h1>{{ route.meta.title }}</h1></div>
+        <div class="context-runtime"><Activity :size="15" />{{ sessionState.health?.llm.provider || 'LLM 未知' }}</div>
+      </div>
       <RouterView />
     </main>
   </div>
 </template>
-
-<style scoped>
-.app { display: flex; flex-direction: column; height: 100%; }
-.topbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 12px 24px;
-  background: #fff;
-  border-bottom: 1px solid var(--border);
-  flex-shrink: 0;
-}
-.brand { display: flex; align-items: center; gap: 12px; }
-.logo {
-  width: 40px; height: 40px; border-radius: 12px;
-  background: linear-gradient(135deg, #6366f1, #4f46e5);
-  color: #fff; font-weight: 700; font-size: 20px;
-  display: grid; place-items: center;
-}
-.brand-name { font-weight: 700; font-size: 16px; }
-.brand-sub { font-size: 12px; color: var(--muted); }
-.nav { display: flex; gap: 6px; }
-.nav-item {
-  display: inline-flex; align-items: center; gap: 6px;
-  padding: 8px 16px; border-radius: 10px;
-  text-decoration: none; color: var(--muted); font-weight: 600;
-}
-.nav-item:hover { background: var(--primary-soft); color: var(--primary-600); }
-.nav-item.active { background: var(--primary); color: #fff; }
-.nav-demo {
-  display: inline-flex; align-items: center; gap: 4px;
-  padding: 8px 12px; border-radius: 10px;
-  background: #fef3c7; color: #b45309; font-weight: 600; font-size: 13px;
-}
-.nav-demo:hover { background: #fde68a; }
-.provider-tag {
-  margin-left: 8px;
-  padding: 1px 8px;
-  border-radius: 999px;
-  background: var(--primary-soft);
-  color: var(--primary-600);
-  font-size: 11px;
-  font-weight: 600;
-}
-.content { flex: 1; overflow: hidden; padding: 20px 24px; }
-</style>

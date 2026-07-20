@@ -19,19 +19,19 @@ public class EmotionService {
 
     public EmotionResult detect(String text) {
         if (text == null || text.isBlank()) {
-            return new EmotionResult(Sentiment.NEUTRAL, 0.1);
+            return new EmotionResult(Sentiment.NEUTRAL, 0.1, 0.7, "rules");
         }
         String t = text.toLowerCase();
         if (containsAny(t, STRONG_NEGATIVE)) {
-            return new EmotionResult(Sentiment.NEGATIVE, 0.9);
+            return new EmotionResult(Sentiment.NEGATIVE, 0.9, 0.96, "rules");
         }
         if (containsAny(t, NEGATIVE)) {
-            return new EmotionResult(Sentiment.NEGATIVE, 0.65);
+            return new EmotionResult(Sentiment.NEGATIVE, 0.65, 0.84, "rules");
         }
         if (containsAny(t, POSITIVE)) {
-            return new EmotionResult(Sentiment.POSITIVE, 0.0);
+            return new EmotionResult(Sentiment.POSITIVE, 0.0, 0.88, "rules");
         }
-        return new EmotionResult(Sentiment.NEUTRAL, 0.1);
+        return new EmotionResult(Sentiment.NEUTRAL, 0.1, 0.72, "rules");
     }
 
     private boolean containsAny(String text, String[] kws) {

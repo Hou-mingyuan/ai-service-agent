@@ -14,58 +14,54 @@ import org.springframework.stereotype.Service;
 
 @Service
 public class JwtService {
-
     private static final String CLAIM_ROLE = "role";
+    private static final String CLAIM_TENANT = "tenant";
+    private static final String CLAIM_DISPLAY_NAME = "displayName";
+    private static final String CLAIM_USER_ID = "userId";
 
-    private final SecurityProperties securityProperties;
+    private final SecurityProperties properties;
 
-    public JwtService(SecurityProperties securityProperties) {
-        this.securityProperties = securityProperties;
+    public JwtService(SecurityProperties properties) {
+        this.properties = properties;
     }
 
-    public String createToken(String username, Role role) {
+    public String createToken(AuthenticatedUser user) {
         Instant now = Instant.now();
-        Instant expiry = now.plusSeconds(securityProperties.getJwtExpirationMinutes() * 60L);
+        Instant expiry = now.plusSeconds(properties.getJwtExpirationMinutes() * 60L);
         return Jwts.builder()
-                .subject(username)
-                .claim(CLAIM_ROLE, role.getId())
+                .subject(user.username())
+                .claim(CLAIM_USER_ID, user.userId())
+                .claim(CLAIM_TENANT, user.tenantId())
+                .claim(CLAIM_DISPLAY_NAME, user.displayName())
+                .claim(CLAIM_ROLE, user.role().getId())
                 .issuedAt(Date.from(now))
                 .expiration(Date.from(expiry))
                 .signWith(signingKey())
                 .compact();
     }
 
-    public Optional<JwtPrincipal> parseToken(String token) {
+    public Optional<AuthenticatedUser> parseToken(String token) {
         if (token == null || token.isBlank()) {
             return Optional.empty();
         }
         try {
-            Claims claims = Jwts.parser()
-                    .verifyWith(signingKey())
-                    .build()
-                    .parseSignedClaims(token)
-                    .getPayload();
+            Claims claims = Jwts.parser().verifyWith(signingKey()).build()
+                    .parseSignedClaims(token).getPayload();
             Role role = Role.fromId(claims.get(CLAIM_ROLE, String.class));
-            if (role == null) {
+            Number userId = claims.get(CLAIM_USER_ID, Number.class);
+            String tenant = claims.get(CLAIM_TENANT, String.class);
+            if (role == null || userId == null || tenant == null || tenant.isBlank()) {
                 return Optional.empty();
             }
-            return Optional.of(new JwtPrincipal(claims.getSubject(), role));
+            return Optional.of(new AuthenticatedUser(
+                    userId.longValue(), tenant, claims.getSubject(),
+                    claims.get(CLAIM_DISPLAY_NAME, String.class), role));
         } catch (Exception ignored) {
             return Optional.empty();
         }
     }
 
-    public boolean hasPermission(String token, String permission) {
-        return parseToken(token)
-                .map(p -> p.role().getPermissions().contains(permission))
-                .orElse(false);
-    }
-
     private SecretKey signingKey() {
-        byte[] keyBytes = securityProperties.getJwtSecret().getBytes(StandardCharsets.UTF_8);
-        return Keys.hmacShaKeyFor(keyBytes);
-    }
-
-    public record JwtPrincipal(String username, Role role) {
+        return Keys.hmacShaKeyFor(properties.getJwtSecret().getBytes(StandardCharsets.UTF_8));
     }
 }

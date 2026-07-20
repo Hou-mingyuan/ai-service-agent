@@ -1,105 +1,72 @@
-# RBAC Roadmap · 智答 AI Service Agent
+# RBAC 与资源隔离（已实现）
 
-> **版本**：2026-07-06（P2 首期规划 · Round-6 定稿）  
-> **范围**：单租户内角色与权限；面向作品集演示 → 准生产演进  
-> **关联**：[SECURITY.md](../SECURITY.md) · [DIMENSION-AUDIT.md](./DIMENSION-AUDIT.md)
+本文件保留原路径以兼容历史链接，但内容描述当前完成态，不是 Roadmap。授权以服务端权限和资源归属为准。
 
----
+## 角色与能力
 
-## 现状
-
-| 能力 | 状态 |
-| --- | --- |
-| 用户端 `/api/chat` | 匿名可访问（演示友好） |
-| 坐席 `/api/tickets/**` | 匿名可访问 |
-| 运营看板 `/api/dashboard/**` | 匿名可访问 |
-| WebSocket `/ws/agent` | 无鉴权 |
-| 审计日志 | 工单状态变更有 DB 事件；无登录审计 |
-
-当前设计适合 **Mock 零密钥 Hub 演示**，不适合多坐席生产环境。
-
----
-
-## 目标角色（单租户）
-
-| 角色 | 标识 | 典型使用者 | 核心权限 |
-| --- | --- | --- | --- |
-| **访客** | `visitor` | 终端用户（网页） | `chat:send`、`feedback:submit` |
-| **坐席** | `agent` | 客服代表 | `ticket:read`、`ticket:transition`、`ticket:assign`、`ws:agent` |
-| **主管** | `supervisor` | 班组长 | 坐席权限 + `ticket:escalate`、`dashboard:read` |
-| **管理员** | `admin` | 运营/IT | 全部 API + `catalog:write`、`config:write` |
-
-权限采用 **资源:动作** 字符串，便于 Spring `@PreAuthorize` 与前端菜单对齐。
-
----
-
-## 分阶段交付
-
-### Phase 1 — 鉴权骨架（P2 · Round-7 代码落地）
-
-- [x] 引入 `spring-security` + JWT（或 Session Cookie）签发 `/api/auth/login`
-- [x] 定义 `Role` 枚举与 `Permission` 常量表（见下节）
-- [x] `/api/tickets/**`、`/api/dashboard/**` 要求 `agent` 及以上（`app.security.rbac-enabled=true` 时生效）
-- [x] `/ws/agent` 握手校验 Bearer Token
-- [x] `/api/chat` 保持匿名（或可选 `visitor` token 绑定会话）
-
-**验收**：Postman 集合 + `mvn test` 覆盖 401/403 矩阵 ✅ `SecurityRbacTest` 5 cases。
-
-### Phase 2 — 坐席工作流（P3）
-
-- [ ] 坐席只能查看/操作已指派或队列内工单
-- [ ] `supervisor` 可重新指派与升级 SLA
-- [ ] 登录/登出/敏感操作写入 `audit_log` 表
-
-### Phase 3 — 生产加固（P3+）
-
-- [ ] API 网关层限流（按角色配额）
-- [ ] OpenTelemetry：`auth.role`、`ticket.transition` 指标
-- [ ] 密钥轮换与坐席账号锁定策略
-
----
-
-## 权限矩阵（首期）
-
-| 端点 / 资源 | visitor | agent | supervisor | admin |
+| 能力 | customer | agent | supervisor | admin |
 | --- | :---: | :---: | :---: | :---: |
-| `POST /api/chat` | ✓ | ✓ | ✓ | ✓ |
-| `GET /api/tickets` | — | ✓ | ✓ | ✓ |
-| `POST /api/tickets/{id}/transition` | — | ✓* | ✓ | ✓ |
-| `POST /api/tickets/{id}/assign` | — | — | ✓ | ✓ |
-| `GET /api/dashboard/overview` | — | — | ✓ | ✓ |
-| `WS /ws/agent` | — | ✓ | ✓ | ✓ |
-| `GET /api/catalog/*` | ✓ | ✓ | ✓ | ✓ |
-| `POST /api/catalog/*` | — | — | — | ✓ |
+| 发起客户对话、提交评价 | ✓ | — | — | ✓ |
+| 查看自己的会话/消息 | ✓ | — | — | ✓ |
+| 查看人工队列 | — | ✓ | ✓ | ✓ |
+| 查看已分配会话并双向回复 | — | ✓ | ✓ | ✓ |
+| 查看工单 | — | 仅自己/队列 | 全部 | 全部 |
+| 认领与合法流转 | — | ✓ | ✓ | ✓ |
+| 指派/升级 | — | — | ✓ | ✓ |
+| 查看工具执行记录 | 自己 | 可访问会话 | 全部 | 全部 |
+| 确认敏感工具 | 仅自己的执行单 | — | — | ✓ |
+| 知识读取 | — | — | ✓ | ✓ |
+| 知识入库/归档 | — | — | — | ✓ |
+| 看板 | — | — | ✓ | ✓ |
+| 审计 | — | — | ✓ | ✓ |
+| 实时事件 | 自己的受众 | 坐席受众 | 坐席受众 | 全部授权受众 |
 
-\* `agent` 仅可操作已指派给自己的工单。
+权限字符串定义在 `Permission`：
 
----
+```text
+chat:send              feedback:submit       conversation:self
+conversation:queue     conversation:all      message:reply
+ticket:read            ticket:transition     ticket:assign
+ticket:escalate        tool:read             tool:sensitive
+knowledge:read         knowledge:write       dashboard:read
+audit:read             ws:events             config:write
+```
 
-## 技术选型建议
+## 资源级规则
 
-| 组件 | 建议 | 说明 |
-| --- | --- | --- |
-| 认证 | JWT（HS256，15min access + refresh） | 与 portfolio 其他 Spring 项目一致 |
-| 授权 | `@PreAuthorize("hasAuthority('ticket:read')")` | 方法级，易单测 |
-| 前端 | Axios 拦截器注入 `Authorization` | 坐席页登录后持有 token |
-| 演示兼容 | `app.security.anonymous-chat=true` 环境变量 | Hub Mock 可继续零登录演示 |
+- 所有实体查询先限制 `tenant_id`。
+- 客户会话还限制 `customer_username`；其他客户的 id 返回 404，避免确认资源存在。
+- 普通坐席只能访问未认领队列或 `assigned_agent=当前用户名` 的会话与工单。
+- 主管和管理员可查看同租户全部会话与工单；只有主管及以上能指派。
+- 工具先校验角色权限，再由具体工具校验订单/保单/工单是否属于当前客户。
+- 敏感执行单确认同时匹配 `tenant_id + id + customer_username + PENDING_CONFIRMATION`。
+- WebSocket/事件重放先按租户、角色和 `audience_id` 过滤，再应用 limit，其他用户事件不能挤占重放窗口。
 
----
+## 认证与 CSRF
 
-## 与 SECURITY.md 的关系
+- `/api/auth/login` 成功后同时返回短期 access token 并设置 `HttpOnly` Cookie。
+- API 客户端可使用 `Authorization: Bearer <token>`；浏览器默认使用 Cookie。
+- 使用认证 Cookie 的非安全方法必须先取 `/api/auth/csrf`，并发送对应 CSRF header；Bearer 请求不依赖 CSRF。
+- `/api/auth/session` 可匿名探测并在未登录时返回空身份；`/api/auth/me` 始终要求认证。
+- JWT 包含用户 id、租户、显示名和角色；服务端仍从持久化用户校验启用状态。
 
-- **Out of scope（当前 release）** 条目将在 Phase 1 完成后移入 In scope。
-- 生产部署前必须完成 Phase 1 + 网关 HTTPS/限流（见 [DEPLOYMENT.md](../DEPLOYMENT.md) §6）。
+## HTTP 语义
 
----
+| 情况 | 状态 |
+| --- | ---: |
+| 未登录访问受保护资源 | 401 |
+| 已登录但缺权限 | 403 |
+| 跨客户/跨坐席枚举资源 | 404 |
+| 并发认领或非法状态竞争 | 409 |
+| 参数/状态机校验失败 | 400/422 |
 
-## 验收命令（Phase 1 完成后）
+统一错误体和正常响应都包含 request id。前端有独立的未登录、权限不足、空数据、离线与错误状态。
+
+## 回归证据
 
 ```bash
 cd backend
-mvn test -Dtest=SecurityRbacTest
-curl -sf -H "Authorization: Bearer $AGENT_TOKEN" http://localhost:8081/api/tickets
+mvn test -Dtest=SecurityRbacTest,SecurityBoundaryTest
 ```
 
-*Phase 1 代码骨架 Round-7 落地（project-hub-2）；默认 `rbac-enabled=false` 保持 Hub Mock 演示。Phase 2+ 跟踪见 [README Roadmap](../README.md) 与 [OPTIMIZATION-BACKLOG](../../ai-portfolio/OPTIMIZATION-BACKLOG.md)。*
+覆盖四角色权限、匿名探测、客户会话 ID 枚举、坐席工单 ID 枚举、Cookie CSRF、SSE 畸形请求、异常媒体类型、敏感执行单归属和审计递归脱敏。完整结果见 [验收证据](../ACCEPTANCE_EVIDENCE.md)。
