@@ -1,0 +1,20 @@
+# docker compose --env-file .env.production -f docker-compose.yml -f docker-compose.production.yml up -d --build --wait
+services:
+  mysql:
+    environment:
+      MYSQL_PASSWORD: ${DATABASE_PASSWORD:?Set a production database password}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Set a production MySQL root password}
+  backend:
+    environment:
+      APP_DEMO_ENABLED: "false"
+      APP_SECURITY_RBAC_ENABLED: "true"
+      APP_SECURITY_ANONYMOUS_CHAT: "false"
+      APP_SECURITY_COOKIE_SECURE: "true"
+      APP_SECURITY_JWT_SECRET: ${APP_SECURITY_JWT_SECRET:?Set a unique JWT secret of at least 32 characters}
+      APP_CORS_ALLOWED_ORIGINS: ${APP_CORS_ALLOWED_ORIGINS:?Set the HTTPS frontend origin}
+      DATABASE_PASSWORD: ${DATABASE_PASSWORD:?Set a production database password}
+      LLM_PROVIDER: openai
+      LLM_API_KEY: ${LLM_API_KEY:?Set the real provider API key}
+      BUSINESS_ADAPTER: http
+      BUSINESS_BASE_URL: ${BUSINESS_BASE_URL:?Set the business API HTTPS URL}
+      BUSINESS_API_TOKEN: ${BUSINESS_API_TOKEN:?Set the business API token}

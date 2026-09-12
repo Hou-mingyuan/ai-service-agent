@@ -44,6 +44,22 @@ curl -f http://127.0.0.1:19040/api/ready
 
 ## 生产配置门禁
 
+生产 Compose 使用随仓库提供的完整覆盖文件。将 `.env.production.example`
+复制为 `.env.production` 并填写空缺凭据，然后执行：
+
+```bash
+docker compose --env-file .env.production -f docker-compose.yml -f docker-compose.production.yml config --quiet
+docker compose --env-file .env.production -f docker-compose.yml -f docker-compose.production.yml up -d --build --wait
+```
+
+`.env` 只参与 Compose 插值，容器只收到 `environment` 中显式映射的值。
+基础 Compose 已映射安全、Demo、业务接口、LLM 和 SLA 参数；生产覆盖强制关闭
+Demo/匿名访问并启用 RBAC/Secure Cookie，缺少凭据时 `config` 即失败。
+变量插值结果可用 `node --test scripts/compose-contract.test.mjs` 验证，无需 Docker 引擎。
+`config` 的完整输出可能包含秘密，日常预检使用 `--quiet`。
+数据库和后端仅绑定宿主回环地址，前端默认也由同机 TLS 代理访问。
+已有 MySQL 卷不会随环境变量自动轮换用户密码，需要先在数据库中完成密码轮换。
+
 Demo Compose 账号和数据库密码不能用于生产。生产至少配置：
 
 ```env

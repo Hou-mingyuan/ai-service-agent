@@ -8,18 +8,18 @@ services:
     environment:
       TZ: Asia/Shanghai
       MYSQL_DATABASE: ai_service_agent
-      MYSQL_USER: csagent
-      MYSQL_PASSWORD: csagentpwd
-      MYSQL_ROOT_PASSWORD: rootpwd
+      MYSQL_USER: ${DATABASE_USERNAME:-csagent}
+      MYSQL_PASSWORD: ${DATABASE_PASSWORD:-csagentpwd}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootpwd}
     volumes:
       - mysqldata:/var/lib/mysql
     healthcheck:
-      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -P19042 -ucsagent -pcsagentpwd || exit 1"]
+      test: ["CMD-SHELL", "MYSQL_PWD=$$MYSQL_PASSWORD mysqladmin ping -h 127.0.0.1 -P19042 -u$$MYSQL_USER || exit 1"]
       interval: 5s
       timeout: 5s
       retries: 20
     ports:
-      - "${MYSQL_HOST_PORT:-19042}:19042"
+      - "127.0.0.1:${MYSQL_HOST_PORT:-19042}:19042"
 
   backend:
     build:
@@ -33,16 +33,40 @@ services:
     environment:
       TZ: Asia/Shanghai
       SPRING_PROFILES_ACTIVE: mysql
-      APP_TIME_ZONE: Asia/Shanghai
+      APP_TIME_ZONE: ${APP_TIME_ZONE:-Asia/Shanghai}
       SERVER_PORT: 19040
-      DATABASE_URL: jdbc:mysql://mysql:19042/ai_service_agent?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
-      DATABASE_USERNAME: csagent
-      DATABASE_PASSWORD: csagentpwd
+      DATABASE_URL: ${DATABASE_URL:-jdbc:mysql://mysql:19042/ai_service_agent?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true}
+      DATABASE_USERNAME: ${DATABASE_USERNAME:-csagent}
+      DATABASE_PASSWORD: ${DATABASE_PASSWORD:-csagentpwd}
+      APP_DEMO_ENABLED: ${APP_DEMO_ENABLED:-true}
+      APP_TENANT_ID: ${APP_TENANT_ID:-demo}
+      APP_CORS_ALLOWED_ORIGINS: ${APP_CORS_ALLOWED_ORIGINS:-http://127.0.0.1:19041,http://localhost:19041}
+      APP_SECURITY_RBAC_ENABLED: ${APP_SECURITY_RBAC_ENABLED:-true}
+      APP_SECURITY_ANONYMOUS_CHAT: ${APP_SECURITY_ANONYMOUS_CHAT:-false}
+      APP_SECURITY_JWT_SECRET: ${APP_SECURITY_JWT_SECRET:-csagent-dev-jwt-secret-change-me-in-prod!!}
+      APP_SECURITY_JWT_EXPIRATION_MINUTES: ${APP_SECURITY_JWT_EXPIRATION_MINUTES:-480}
+      APP_SECURITY_COOKIE_NAME: ${APP_SECURITY_COOKIE_NAME:-CSAGENT_AUTH}
+      APP_SECURITY_COOKIE_SECURE: ${APP_SECURITY_COOKIE_SECURE:-false}
+      APP_SECURITY_COOKIE_SAME_SITE: ${APP_SECURITY_COOKIE_SAME_SITE:-Strict}
       LLM_PROVIDER: ${LLM_PROVIDER:-mock}
       LLM_BASE_URL: ${LLM_BASE_URL:-https://api.openai.com/v1}
       LLM_MODEL: ${LLM_MODEL:-gpt-4o-mini}
       LLM_API_KEY: ${LLM_API_KEY:-}
       LLM_TEMPERATURE: ${LLM_TEMPERATURE:-0.3}
+      LLM_TIMEOUT: ${LLM_TIMEOUT:-60}
+      LLM_MAX_TOOL_ROUNDS: ${LLM_MAX_TOOL_ROUNDS:-3}
+      LLM_ALLOW_PRIVATE_BASE_URL: ${LLM_ALLOW_PRIVATE_BASE_URL:-false}
+      BUSINESS_ADAPTER: ${BUSINESS_ADAPTER:-mock}
+      BUSINESS_BASE_URL: ${BUSINESS_BASE_URL:-}
+      BUSINESS_API_TOKEN: ${BUSINESS_API_TOKEN:-}
+      BUSINESS_TIMEOUT_SECONDS: ${BUSINESS_TIMEOUT_SECONDS:-5}
+      BUSINESS_MAX_RETRIES: ${BUSINESS_MAX_RETRIES:-1}
+      SLA_URGENT_MINUTES: ${SLA_URGENT_MINUTES:-15}
+      SLA_HIGH_MINUTES: ${SLA_HIGH_MINUTES:-60}
+      SLA_MEDIUM_MINUTES: ${SLA_MEDIUM_MINUTES:-240}
+      SLA_LOW_MINUTES: ${SLA_LOW_MINUTES:-480}
+      SLA_WARNING_MINUTES: ${SLA_WARNING_MINUTES:-5}
+      SLA_SCAN_INTERVAL_MS: ${SLA_SCAN_INTERVAL_MS:-30000}
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:19040/api/health | grep -q '\"status\":\"UP\"' || exit 1"]
       interval: 5s
@@ -50,7 +74,7 @@ services:
       retries: 24
       start_period: 15s
     ports:
-      - "${BACKEND_HOST_PORT:-19040}:19040"
+      - "127.0.0.1:${BACKEND_HOST_PORT:-19040}:19040"
 
   frontend:
     build: ./frontend
@@ -66,7 +90,7 @@ services:
       timeout: 5s
       retries: 12
     ports:
-      - "${FRONTEND_HOST_PORT:-19041}:19041"
+      - "${FRONTEND_BIND_ADDRESS:-127.0.0.1}:${FRONTEND_HOST_PORT:-19041}:19041"
 
 volumes:
   mysqldata:
