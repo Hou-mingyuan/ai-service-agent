@@ -29,6 +29,9 @@ jobs:
       - name: Secret and legacy endpoint scan
         run: node scripts/quality-gates.mjs
 
+      - name: Deployment contract tests (compose rendering + nginx template)
+        run: node --test scripts/compose-contract.test.mjs scripts/nginx-template.test.mjs
+
       - name: Whitespace and patch integrity
         run: git diff --check
 
