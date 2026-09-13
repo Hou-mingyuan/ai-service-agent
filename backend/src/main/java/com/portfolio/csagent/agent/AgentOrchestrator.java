@@ -100,7 +100,7 @@ public class AgentOrchestrator {
         boolean explicitHandoff = intent == Intent.HUMAN_AGENT || intent == Intent.TICKET_CREATE;
         boolean negativeHandoff = emotion.isNegative()
                 && emotion.score() >= properties.getAgent().getNegativeEscalateThreshold();
-        boolean lowConfidence = intentResult.confidence() < 0.4;
+        boolean lowConfidence = intentResult.confidence() < properties.getAgent().getLowConfidenceThreshold();
         if (explicitHandoff || negativeHandoff || lowConfidence) {
             String reason = explicitHandoff ? "客户主动要求人工或创建工单"
                     : negativeHandoff ? "检测到明显负面情绪" : "意图置信度过低";

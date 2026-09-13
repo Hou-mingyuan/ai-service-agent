@@ -41,6 +41,8 @@ public class AppProperties {
         private int historyTurns = 8;
         /** 负面情绪分数达到该阈值即自动升级 / 转人工 */
         private double negativeEscalateThreshold = 0.6;
+        /** 意图置信度低于该阈值即转人工 */
+        private double lowConfidenceThreshold = 0.4;
         private String systemPrompt = "你是智能客服助手，请用简体中文礼貌专业地回答。";
         private int knowledgeTopK = 3;
         private double knowledgeMinScore = 0.2;

@@ -62,6 +62,8 @@ app:
     history-turns: 8
     # 情绪负面分数达到该阈值即自动升级 / 转人工
     negative-escalate-threshold: 0.6
+    # 意图置信度低于该阈值即转人工
+    low-confidence-threshold: 0.4
     knowledge-top-k: 3
     knowledge-min-score: 0.2
     sse-timeout-seconds: 90
